@@ -1,0 +1,9 @@
+{
+  "name": "LOL",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "csv-parser": "^2.3.2"
+  }
+}
