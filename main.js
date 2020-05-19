@@ -4,47 +4,33 @@ const results = [];
 
 const file='DKSalaries.csv';
 
+const allowNoFPTS = true;
+const forceTeamStack = false;
+
 const captainTrimFront = 3;
-const captainTrimBack = 12;
-const maximumSalaryRemaining = 600;
-const minimumSalaryRemaining = 1100;
+const captainTrimBack = 0;
+const maximumSalaryRemaining = 2800;
+const minimumSalaryRemaining = 2100;
 
 const max = 50000;
 
 const skipPlayers = [
-  " SS",
-  " Dread",
-  " All iN",
-  " Ben",
-  " Hoon",
-  " Wings",
-  " Moonlight",
-  " ADD",
-  " bless",
-  " melody",
-  " April",
-  " mingjing",
-  " Weiwei",
-  " Biubiu",
-  " Ning",
-  " Baolan",
-  " Fate",
-  " Xiaowei",
-  " Quad", //check
-  " JunJia",
-  " Xinyi",
-  " Aodi",
-  " xiaoxiang",
-  " Khan",
-  " Xiao7",
-  " Kellin", //ehck
-  " Zenit", //check
-  " Lava" //check
+  " Hanabii"
 ];
 
-const skipCaptains = [];
+const skipCaptains = [
+  " Sarkis",
+  " Panj",
+  " Hidan",
+  " dyNquedo",
+  " Rainbow"
+];
+
+const playCaptains = [];
 
 const skipTeams = [];
+
+const skipTeamPlayers = [];
 
 const useTeams = [];
 
@@ -52,15 +38,17 @@ const sortToTeams = (data) => {
   const teams = {};
   const captains = [];
   const teamPlayers = [];
-  const teamsRegex = /(.{1,3})@(.{1,3})/g;
+  const teamsRegex = /(.\S{1,})@(.\S{1,})/g;
   data.forEach((player) => {
     const isCaptain = player["Roster Position"] === "CPT";
     if (isCaptain) {
       return;
     }
-    const hasPoints = player["AvgPointsPerGame"] !== "0";
-    if (!hasPoints) {
-      return;
+    if (!allowNoFPTS) {
+      const hasPoints = player["AvgPointsPerGame"] !== "0";
+      if (!hasPoints) {
+        return;
+      }
     }
 
     if (skipPlayers.includes(player.Name)) {
@@ -101,10 +89,15 @@ const sortToTeams = (data) => {
       }
     }
 
-    if (newPlayer.Position === "ADC" || newPlayer.Position === "MID" || newPlayer.Position === "JNG") {
-      if (skipCaptains.includes(player.Name)) {
+    if (newPlayer.Position !== "TEAM") {
+      if (skipCaptains.includes(player.Name) || skipCaptains.includes(player.TeamAbbrev)) {
         return;
       }
+
+      if (playCaptains.length > 0 && !playCaptains.includes(player.Name)) {
+        return;
+      }
+
       if (captains.length < 20) {
         captains.push({...newPlayer, opponent});
       }
@@ -137,19 +130,61 @@ const orderLineup = (lineup) => {
 
 // tf two four one
 // ft four two one
-const tfADC = ["TOP", "JNG", "SUP"];
-const ftADC = ["TOP", "JNG", "MID"];
+const adcArrays = [
+  ["TOP", "JNG", "MID"],
+  ["TOP", "JNG", "SUP"],
+  ["MID", "JNG", "SUP"],
+  ["JNG", "MID", "SUP"]
+  // ["TOP", "SUP"],
+  // ["TOP", "JNG"],
+  // ["TOP", "MID"],
+  // ["JNG", "SUP"],
+  // ["JNG", "MID"],
+  // ["MID", "SUP"]
+];
 
-const tfMid = ["TOP", "JNG", "SUP"];
-const ftMid=  ["TOP", "ADC", "SUP"];
+const midArrays = [
+  ["TOP", "JNG", "ADC"],
+  ["TOP", "JNG", "SUP"],
+  ["TOP", "ADC", "SUP"],
+  ["JNG", "ADC", "SUP"]
+  // ["TOP", "SUP"],
+  // ["TOP", "JNG"],
+  // ["TOP", "ADC"],
+  // ["JNG", "SUP"],
+  // ["JNG", "ADC"],
+  // ["ADC", "SUP"]
+]
 
-const tfJungle = ["TOP", "MID", "SUP"];
-const ftJungle = ["TOP", "ADC", "SUP"];
+const jngArrays = [
+  ["TOP", "MID", "ADC"],
+  ["TOP", "MID", "SUP"],
+  ["TOP", "ADC", "SUP"],
+  ["MID", "ADC", "SUP"]
+  // ["TOP", "SUP"],
+  // ["TOP", "MID"],
+  // ["TOP", "ADC"],
+  // ["MID", "SUP"],
+  // ["MID", "ADC"],
+  // ["ADC", "SUP"]
+];
 
-// other team
-// full captain object
-// team of captain
-// arr
+const topArrays = [
+  ["JNG", "MID", "ADC"],
+  ["MID", "ADC", "SUP"],
+  ["JNG", "ADC", ]
+  // ["JNG", "MID"],
+  // ["MID", "ADC"]
+];
+
+const supArrays = [
+  // ["JNG", "MID"],
+  ["TOP", "JNG", "MID"],
+  ["JNG", "MID", "ADC"]
+  // ["TOP", "JNG"],
+  // ["TOP", "MID"]
+];
+
 const generate = (vsTeam, captain, captainTeam, neededPOS, teamPlayers) => {
   const returnNames = [];
   const returnIDs = [];
@@ -172,29 +207,45 @@ const generate = (vsTeam, captain, captainTeam, neededPOS, teamPlayers) => {
   const salaryStacksTotal = pairedSalary + otherSalary;
   const salaryStacksRemaining = max - salaryStacksTotal;
 
-  if (salaryStacksRemaining < 8000 && salaryStacksRemaining > 3500) {
+  if (salaryStacksRemaining > 3500) {
     teamPlayers.forEach((team) => {
-  
-      if (team.TeamAbbrev === captain.opponent) {
-        return;
-      }
+      if (forceTeamStack) {
+        if (otherTeam[0].TeamAbbrev !== captain.opponent) {
+          return;
+        }
+        if (team.TeamAbbrev === captain.TeamAbbrev || team.TeamAbbrev === otherTeam[0].TeamAbbrev) {
+          return;
+        }
+      } else {
+        if (pairedPlayers.length > 2 && team.TeamAbbrev === captain.TeamAbbrev) {
+          return;
+        }
 
-      if (team.TeamAbbrev === captain.TeamAbbrev) {
-        return;
-      }
+        if (otherTeam.length > 3 && team.TeamAbbrev === otherTeam[0].TeamAbbrev) {
+          return;
+        }
 
-      if (team.TeamAbbrev === vsTeam.opponent) {
+        if (otherTeam[0].TeamAbbrev === captain.TeamAbbrev) {
+          return;
+        }
+
+        if (team.TeamAbbrev !== captain.TeamAbbrev && team.TeamAbbrev !== otherTeam[0].TeamAbbrev) {
+          return;
+        }
+
+        if (otherTeam[0].TeamAbbrev === captain.opponent) {
+          return;
+        }
+      }
+    
+      if (skipTeamPlayers.includes(team.TeamAbbrev)) {
         return;
       }
 
       const teamSalary = parseInt(team.Salary);
       const teamTotal = salaryStacksTotal + teamSalary;
-      let isValidSalaryLower = max - teamTotal > 0;
-      let isValidSalaryUpper = max - teamTotal > 0;
-      if (minimumSalaryRemaining > 0 && maximumSalaryRemaining > 0) {
-        isValidSalaryUpper =  max - teamTotal <= minimumSalaryRemaining;
-        isValidSalaryLower = max - teamTotal >= maximumSalaryRemaining;
-      }
+      const isValidSalaryUpper =  max - teamTotal <= maximumSalaryRemaining;
+      const isValidSalaryLower = max - teamTotal >= minimumSalaryRemaining;
       const orderedTeam = orderLineup([...stacks, team]);
       const finalTeam = [captain, ...orderedTeam];
       if (isValidSalaryUpper && isValidSalaryLower) {
@@ -212,73 +263,67 @@ const createLines = (captain, teams, teamPlayers) => {
   const options = [];
   const optionsIDs = [];
   const captainTeam = teams[captain.TeamAbbrev];
-
   if (captain.Position === "ADC") {
     Object.values(teams).forEach((team) => {
-      if (team["TEAM"].TeamAbbrev === captain.TeamAbbrev) {
-        return;
-      }
-  
-      if (team["TEAM"].TeamAbbrev === captain.opponent) {
-        return;
-      }
-      const { 
-        returnNames: tfLinesNames,
-        returnIDs: tfLinesIDs
-      } = generate(team, captain, captainTeam, tfADC, teamPlayers);
-      const {
-        returnNames: ftLinesNames,
-        returnIDs: ftLinesIDs
-      } = generate(team, captain, captainTeam, ftADC, teamPlayers);
-      options.push(...tfLinesNames, ...ftLinesNames);
-      optionsIDs.push(...tfLinesIDs, ...ftLinesIDs);
+      adcArrays.forEach((arr) => {
+        const {
+          returnNames,
+          returnIDs
+        } = generate(team, captain, captainTeam, arr, teamPlayers);
+        options.push(...returnNames);
+        optionsIDs.push(...returnIDs);
+      });
     });
   }
 
   if (captain.Position === "MID") {
     Object.values(teams).forEach((team) => {
-      if (team["ADC"].TeamAbbrev === captain.TeamAbbrev) {
-        return;
-      }
-  
-      if (team["ADC"].TeamAbbrev === captain.opponent) {
-        return;
-      }
-      const {
-        returnNames: tfLinesNames,
-        returnIDs: tfLinesIDs
-      } = generate(team, captain, captainTeam, tfMid, teamPlayers);
-      const {
-        returnNames: ftLinesNames,
-        returnIDs: ftLinesIDs
-      } = generate(team, captain, captainTeam, ftMid, teamPlayers);
-      options.push(...tfLinesNames, ...ftLinesNames);
-      optionsIDs.push(...tfLinesIDs, ...ftLinesIDs);
+      midArrays.forEach((arr) => {
+        const {
+          returnNames,
+          returnIDs
+        } = generate(team, captain, captainTeam, arr, teamPlayers);
+        options.push(...returnNames);
+        optionsIDs.push(...returnIDs);
+      });
     });
   }
-
   if (captain.Position === "JNG") {
     Object.values(teams).forEach((team) => {
-      if (team["ADC"].TeamAbbrev === captain.TeamAbbrev) {
-        return;
-      }
-  
-      if (team["ADC"].TeamAbbrev === captain.opponent) {
-        return;
-      }
-      const { 
-        returnNames: tfLinesNames,
-        returnIDs: tfLinesIDs
-      } = generate(team, captain, captainTeam, tfJungle, teamPlayers);
-      const {
-        returnNames: ftLinesNames,
-        returnIDs: ftLinesIDs
-      } = generate(team, captain, captainTeam, ftJungle, teamPlayers);
-      options.push(...tfLinesNames, ...ftLinesNames);
-      optionsIDs.push(...tfLinesIDs, ...ftLinesIDs);
+      jngArrays.forEach((arr) => {
+        const {
+          returnNames,
+          returnIDs
+        } = generate(team, captain, captainTeam, arr, teamPlayers);
+        options.push(...returnNames);
+        optionsIDs.push(...returnIDs);
+      });
     });
   }
-
+  if (captain.Position === "TOP") {
+    Object.values(teams).forEach((team) => {
+      topArrays.forEach((arr) => {
+        const {
+          returnNames,
+          returnIDs
+        } = generate(team, captain, captainTeam, arr, teamPlayers);
+        options.push(...returnNames);
+        optionsIDs.push(...returnIDs);
+      });
+    });
+  }
+  if (captain.Position === "SUP") {
+    Object.values(teams).forEach((team) => {
+      supArrays.forEach((arr) => {
+        const {
+          returnNames,
+          returnIDs
+        } = generate(team, captain, captainTeam, arr, teamPlayers);
+        options.push(...returnNames);
+        optionsIDs.push(...returnIDs);
+      });
+    });
+  }
   return { options, optionsIDs };
 };
  
@@ -294,9 +339,8 @@ fs.createReadStream(file)
 
     const lines = [["CPT","TOP","JNG","MID","ADC","SUP","TEAM", "Total"]];
     const linesIDs = [["CPT","TOP","JNG","MID","ADC","SUP","TEAM", "", ""]];
-    console.info(captains.map((captain) => captain.Name));
+    captains.sort((a, b) => a.captainSalary > b.captainSalary);
     captains.reverse();
-    console.info(captains.map((captain) => captain.Name));
     useCaptains = captains.splice(captainTrimFront, (captains.length - captainTrimFront) - captainTrimBack);
 
     console.info(useCaptains.map((captain) => captain.Name));
